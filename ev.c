@@ -289,47 +289,169 @@ static bool fill_buffer(fool_io *io)
     return rv > 0;
 }
 
+static bool getb(fool_io *io, size_t offset, uint8_t *out)
+{
+    while (offset >= fool_buffer_size(&io->buf))
+    {
+        // This will DTRT if io->opt.nonblocking.
+        if (!fill_buffer(io))
+        {
+            *out = '\0';
+            return false;
+        }
+    }
+    *out = fool_buffer_at(&io->buf, offset);
+    return true;
+}
+
+static int32_t low_bits(int32_t val, int bits)
+{
+    return val & ((1 << bits) - 1);
+}
+
+static size_t get(fool_io *io, size_t offset, int32_t *out)
+{
+    switch (io->opts.encoding)
+    {
+    case FOOL_UTF8:
+        {
+            uint8_t c[6];
+#define bits (7 - n)
+            int n;
+            if (!getb(io, offset, &c[0]))
+            {
+                *out = 0;
+                return false;
+            }
+            if ((c[0] & 0x80) == 0x00)
+            {
+                *out = c[0];
+                return 1;
+            }
+            else if ((c[0] & 0xe0) == 0xc0)
+                n = 2; // bits=5
+            else if ((c[0] & 0xf0) == 0xe0)
+                n = 3; // bits=4
+            else if ((c[0] & 0xf8) == 0xf0)
+                n = 4; // bits=3
+            else if ((c[0] & 0xfc) == 0xf8)
+                n = 5; // bits=2
+            else if ((c[0] & 0xfe) == 0xfc)
+                n = 6; // bits=1
+            else
+                goto utf8_error;
+            for (int i = 1; i < n; ++i)
+            {
+                if (!getb(io, offset + i, &c[i]))
+                {
+                    *out = 0;
+                    return false;
+                }
+                if ((c[i] & 0xc0) != 0x80)
+                    goto utf8_error;
+            }
+            int32_t rv = low_bits(c[0], bits);
+            for (int i = 1; i < n; ++i)
+            {
+                rv <<= 6;
+                rv |= c[i] & 0x3f;
+            }
+            // overlong encoding
+            switch (n)
+            {
+            case 2:
+                if (rv < 0x0080)
+                    goto utf8_error;
+                break;
+            case 3:
+                if (rv < 0x0800)
+                    goto utf8_error;
+                break;
+            case 4:
+                if (rv < 0x00010000)
+                    goto utf8_error;
+                break;
+            case 5:
+                if (rv < 0x00200000)
+                    goto utf8_error;
+                break;
+            case 6:
+                if (rv < 0x04000000)
+                    goto utf8_error;
+                break;
+            }
+            // unicode maximum
+            if (rv > 0x10ffff)
+                goto utf8_error;
+            // surrogates
+            if (0xd800 <= rv && rv <= 0xdfff)
+                goto utf8_error;
+            *out = rv;
+            return n;
+#undef bits
+        utf8_error:
+            // like python errors='surrogateescape'
+            *out = 0xdc00 | c[0];
+            return 1;
+        }
+    case FOOL_8BIT:
+        {
+            uint8_t tmp;
+            bool rv = getb(io, offset, &tmp);
+            *out = tmp;
+            return rv;
+        }
+    default:
+        abort();
+    }
+}
+
 int32_t fool_event_get(fool_io *io, fool_event *ev)
 {
+    size_t offset = 0, got;
     fool_event tmp;
     if (!ev)
         ev = &tmp;
     memset(ev, '\0', sizeof(*ev));
     strcpy(ev->utf8, "bug");
 
-    size_t sz = fool_buffer_size(&io->buf);
-
-    if (!sz && !fill_buffer(io))
+    got = get(io, offset, &ev->basic);
+    if (!got)
     {
         ev->basic = FOOL_EVENT_EOF;
         return ev->basic;
     }
+    assert (got <= 4);
+    for (size_t i = 0; i < 4; ++i)
+    {
+        if (i < got)
+            ev->utf8[i] = fool_buffer_at(&io->buf, offset + i);
+        else
+            ev->utf8[i] = '\0';
+    }
+    offset += got;
 
-    ev->basic = (uint8_t)fool_buffer_at(&io->buf, 0);
-    fool_buffer_cut(&io->buf, 1);
-
-    if (ev->basic & 0x80)
+    if (0x80 <= (ev->basic & FOOL_KEY_MASK) && (ev->basic & FOOL_KEY_MASK) <= (io->opts.force_meta ? 0xff : 0x9f))
     {
         ev->basic &= ~0x80;
         ev->basic |= FOOL_MASK_META;
     }
-    switch (ev->basic & 0x7f)
+    switch (ev->basic & FOOL_KEY_MASK)
     {
-    case '\x1b':
-        ev->basic = FOOL_KEY_ESC;
+    case '\x1b': // ^[
+        ev->basic = (ev->basic&~FOOL_KEY_MASK) | FOOL_KEY_ESC;
         break;
-    case '\t':
-        ev->basic = FOOL_KEY_TAB;
+    case '\t': // ^I
+        ev->basic = (ev->basic&~FOOL_KEY_MASK) | FOOL_KEY_TAB;
         break;
-    case '\r':
-        ev->basic = FOOL_KEY_ENTER;
+    case '\r': // ^M
+        ev->basic = (ev->basic&~FOOL_KEY_MASK) | FOOL_KEY_ENTER;
         break;
-    case '\x7f':
-        // ev->basic = FOOL_MASK_CTRL | (ev->basic - 0x40);
-        ev->basic = FOOL_KEY_BACKSPACE;
+    case '\x7f': // ^?
+        ev->basic = (ev->basic&~FOOL_KEY_MASK) | FOOL_KEY_BACKSPACE;
         break;
     default:
-        if ((ev->basic & 0x7f) < 0x20)
+        if ((ev->basic & FOOL_KEY_MASK) < 0x20)
         {
             ev->basic += 0x40;
             ev->utf8[0] = ev->basic & 0x7f;
@@ -338,14 +460,8 @@ int32_t fool_event_get(fool_io *io, fool_event *ev)
             ev->utf8[3] = 0;
             ev->basic |= FOOL_MASK_CTRL;
         }
-        else
-        {
-            ev->utf8[0] = ev->basic & 0x7f;
-            ev->utf8[1] = 0;
-            ev->utf8[2] = 0;
-            ev->utf8[3] = 0;
-        }
     }
+    fool_buffer_cut(&io->buf, offset);
     return ev->basic;
 }
 

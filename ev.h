@@ -85,8 +85,13 @@ struct fool_options
     // such as fool_event_string.
     bool no_extra;
 
+    // Don't change various termios settings.
     bool keep_input_break, keep_input_sig;
     bool keep_input_xon_xoff;
+
+    // Interpret U+00a0 through U+00ff as meta-modified ascii.
+    bool force_meta;
+
     // More options will be added in future.
     // For source-compatibility, initialize the entire structure to 0.
     // For binary-compatibility, pass the known size to fool_io_open2.
