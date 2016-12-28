@@ -1,0 +1,26 @@
+.*\.x:
+.*\.so:
+
+[a-z]
+U
+fool_.*
+pthread_.*
+main
+_IO_stdin_used
+__TMC_END__
+__bss_start
+__data_start
+__dso_handle
+__libc_csu_fini
+__libc_csu_init
+_edata
+_end
+_fini
+_init
+_start
+W data_start
+__bss_start
+_edata
+_end
+_fini
+_init
