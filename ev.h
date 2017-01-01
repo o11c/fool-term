@@ -23,25 +23,28 @@ enum
     FOOL_UTF8 = 0,
 
     // But this probably works too.
+    // And the below can be implemented using it if you really need to.
+    // If 0x80 through 0x9f are printable, you must also set no_c1 = true.
     FOOL_8BIT = 1,
-
-    // Actually, this is a meta-encoding, it should be separate?
-    // Can be made ASCII-safe, but usually isn't.
-    // FOOL_ISO2022,
 
     // Characters with the high-bit set are usually paired.
     // Fully ASCII-safe.
-    // 0x8f starts a 3-byte sequence (for EUC-JP).
-    // 0x8e starts a 4-byte sequence (for EUC-TW).
-    // FOOL_EUC,
+    // 0x8f (C1 SS3) starts a 3-byte sequence (for EUC-JP).
+    // 0x8e (C1 SS2) starts a 4-byte sequence (for EUC-TW).
+    // No other C1 controls are used internally.
+    // EUC-CN and EUC-KR need no exceptions.
+    // TODO - figure out how to do text encoding for these!
+    //FOOL_EUC,
 
     // Lead(and third) 0x81-0xfe, 2-byte second 0x40-0xfe, four-byte 2nd/4th 0x30-0x39
     // Never ASCII-safe.
     // FOOL_LEGACY_CJK,
 
+    // Actually, this is a meta-encoding, it should be separate?
+    // Can be made ASCII-safe, but usually isn't.
+    // FOOL_ISO2022,
+
     FOOL_MAX_ENCODINGS,
-    // TODO legacy CJK encodings.
-    // But in general, supporting more encodings is *not* a goal.
 };
 
 struct fool_options
@@ -53,6 +56,12 @@ struct fool_options
     // This is necessary when the user presses the "Esc" key.
     // If 0, use getenv("ESCDELAY") or 1000.
     // If -1, never timeout, (reproducible, but usually breaks various things).
+    //
+    // We use esc_delay when the input buffer has one of the following forms:
+    //  *   \e
+    //  *   \e\e
+    //  *   \eA
+    // In particular, it is *not* used once we have committed to a sequence.
     int esc_delay;
 
     // Don't close the FDs passed to io_open.
@@ -92,6 +101,24 @@ struct fool_options
     // Interpret U+00a0 through U+00ff as meta-modified ascii.
     bool force_meta;
 
+    // Always use long-form ESC+letter controls rather than C1 controls.
+    // This is probably only useful with encoding=FOOL_8BIT, if you're
+    // using something like windows cp1252, which treats them as printable.
+    bool no_c1;
+
+    // Don't accept BEL in place of ST (under OSC only; an xterm extension).
+    bool no_osc_bel;
+
+    // Terminate CSI sequences on $ (an rxvt bug, prevents other sequences).
+    bool csi_dollar;
+
+    // Don't allow SS3 as a prefix, or as a CSI introducer.
+    // Needed for various special keys in some terminal emulators.
+    bool no_ss3, no_long_ss3;
+    // Don't treat [ as a CSI intermediate.
+    // Needed on the Linux console for F1-F5.
+    bool no_csi_lsqb;
+
     // More options will be added in future.
     // For source-compatibility, initialize the entire structure to 0.
     // For binary-compatibility, pass the known size to fool_io_open2.
@@ -101,44 +128,40 @@ struct fool_event
 {
     // Same as the return value.
     int32_t basic;
-    // Valid only if FOOL_EVENT_IS_TEXT, otherwise undefined.
-    char utf8[4];
-    // Used for certain special cases.
+    union
+    {
+        // Valid only if FOOL_EVENT_IS_TEXT, otherwise undefined.
+        char utf8[4];
+        // Used for winch and mouse events.
+        uint16_t coords[2];
+    };
+    // Used for certain special cases, unless no_extra is set.
     void *extra;
 };
 
-/*
-    Note that *not* all negative values are errors.
-    Rather, they just require special handling.
-*/
 // This was not a TTY, and the end of file/pipe was reached.
-// For TTYs, you will get SIGHUP instead.
-// TODO if you ignore the SIGHUP, you get errno=EIO ...
-#define FOOL_EVENT_EOF      -1
-// There was no input yet, and opt.nonblock was set.
-#define FOOL_EVENT_TIMEOUT  -2
-// This is wrong, we need arguments!
-//#define FOOL_EVENT_WINCH    -3
-
-/*
-    Check true if the event is "special" - i.e. not a key nor mouse.
-
-    Most of these can be ignored, except FOOL_EVENT_EOF and FOOL_EVENT_TIMEOUT
-*/
-#define FOOL_EVENT_IS_SPECIAL(evb)  ((evb) < 0)
-/*
-    Check if the event is "normal" - i.e. a key or mouse.
-
-    Normal events can have modifiers, or refer to various keys.
-*/
-#define FOOL_EVENT_IS_NORMAL(evb)   ((evb) >= 0)
+// For TTYs, you will get SIGHUP instead, unless you ignore it.
+#define FOOL_EVENT_EOF      (FOOL_KEY_ALLOC - 1)
+// There was no complete input yet, and opt.nonblock was set.
+#define FOOL_EVENT_TIMEOUT  (FOOL_KEY_ALLOC - 2)
+// Please redraw the entire window.
+#define FOOL_EVENT_WINCH    (FOOL_KEY_ALLOC + 1)
+// Unparsed escape sequences.
+#define FOOL_EVENT_OTHER_ISO2022 (FOOL_KEY_ALLOC + ' ')
+#define FOOL_EVENT_OTHER_SS3    (FOOL_KEY_ALLOC + 'O')
+#define FOOL_EVENT_OTHER_DCS    (FOOL_KEY_ALLOC + 'P')
+#define FOOL_EVENT_OTHER_SOS    (FOOL_KEY_ALLOC + 'X')
+#define FOOL_EVENT_OTHER_CSI    (FOOL_KEY_ALLOC + '[')
+#define FOOL_EVENT_OTHER_OSC    (FOOL_KEY_ALLOC + ']')
+#define FOOL_EVENT_OTHER_PM     (FOOL_KEY_ALLOC + '^')
+#define FOOL_EVENT_OTHER_APC    (FOOL_KEY_ALLOC + '_')
 
 /*
     Check if the event is textual input (without modifiers).
     Note that tab, newline, and escape (as well as other control characters)
     will *not* satisfy this.
 */
-#define FOOL_EVENT_IS_TEXT(evb)     (FOOL_EVENT_IS_NORMAL(evb) && (evb) <= 0x10FFFF)
+#define FOOL_EVENT_IS_TEXT(evb)     ((evb) <= 0x10FFFF)
 
 /*
     Start immediately after the end of Unicode.
@@ -163,7 +186,9 @@ struct fool_event
 #define FOOL_KEY_DOWN       (FOOL_KEY_START + 12)
 #define FOOL_KEY_RIGHT      (FOOL_KEY_START + 13)
 #define FOOL_KEY_LEFT       (FOOL_KEY_START + 14)
+#define FOOL_KEY_CENTER     (FOOL_KEY_START + 15)
 
+#define FOOL_MASK_KEYPAD    (1 << 23)
 #define FOOL_MASK_SHIFT     (1 << 24)
 #define FOOL_MASK_ALT       (1 << 25)
 #define FOOL_MASK_CTRL      (1 << 26)
@@ -171,13 +196,10 @@ struct fool_event
 #define FOOL_MASK_LMB       (1 << 28)
 #define FOOL_MASK_MMB       (1 << 29)
 #define FOOL_MASK_RMB       (1 << 30)
-#define FOOL_MOD_MASK       0x7f000000
+#define FOOL_MOD_MASK       0x7f800000
 
-/*
-    3 bits left.
-    1 is needed for the keypad flag.
-*/
-#define FOOL_TODO_MASK      0x00e00000
+// 2 bits left.
+#define FOOL_TODO_MASK      0x00600000
 
 
 /*

@@ -29,7 +29,7 @@ void fool_expand_signal_handlers(const sigset_t *signals, const fool_sigs_simple
     MAYBE_ASSIGN(SIGILL, simple->crash);
     MAYBE_ASSIGN(SIGABRT, simple->crash);
     MAYBE_ASSIGN(SIGFPE, simple->crash);
-    MAYBE_ASSIGN(SIGKILL, simple->crash);
+    //MAYBE_ASSIGN(SIGKILL, simple->crash);
     MAYBE_ASSIGN(SIGSEGV, simple->crash);
     MAYBE_ASSIGN(SIGPIPE, simple->crash);
     MAYBE_ASSIGN(SIGALRM, simple->crash);
@@ -38,7 +38,7 @@ void fool_expand_signal_handlers(const sigset_t *signals, const fool_sigs_simple
     MAYBE_ASSIGN(SIGUSR2, simple->crash);
     MAYBE_ASSIGN(SIGCHLD, simple->child);
     MAYBE_ASSIGN(SIGCONT, simple->cont);
-    MAYBE_ASSIGN(SIGSTOP, simple->stop);
+    //MAYBE_ASSIGN(SIGSTOP, simple->stop);
     MAYBE_ASSIGN(SIGTSTP, simple->stop);
     MAYBE_ASSIGN(SIGTTIN, simple->stop);
     MAYBE_ASSIGN(SIGTTOU, simple->stop);
@@ -98,6 +98,7 @@ void fool_do_chain(siginfo_t *info, const fool_sigs *chain)
     const struct sigaction *sa = &chain->sigs[info->si_signo];
     if (sa->sa_flags & SA_SIGINFO)
     {
+        // Forward to a 3-arg handler.
         sigset_t old;
         pthread_sigmask(SIG_BLOCK, &sa->sa_mask, &old);
         (sa->sa_sigaction)(info->si_signo, info, NULL);
@@ -111,6 +112,7 @@ void fool_do_chain(siginfo_t *info, const fool_sigs *chain)
     }
     else if (sa->sa_handler != SIG_DFL)
     {
+        // Forward to a 1-arg handler.
         sigset_t old;
         pthread_sigmask(SIG_BLOCK, &sa->sa_mask, &old);
         (sa->sa_handler)(info->si_signo);
