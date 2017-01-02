@@ -144,6 +144,12 @@ struct fool_event
 #define FOOL_EVENT_EOF      (FOOL_KEY_ALLOC - 1)
 // There was no complete input yet, and opt.nonblock was set.
 #define FOOL_EVENT_TIMEOUT  (FOOL_KEY_ALLOC - 2)
+// Distinguish pastes from typed text.
+#define FOOL_EVENT_PASTE_BEGIN  (FOOL_KEY_ALLOC - 3)
+#define FOOL_EVENT_PASTE_END    (FOOL_KEY_ALLOC - 4)
+// Is xterm the active window?
+#define FOOL_EVENT_FOCUS_GAINED (FOOL_KEY_ALLOC - 5)
+#define FOOL_EVENT_FOCUS_LOST   (FOOL_KEY_ALLOC - 6)
 // Please redraw the entire window.
 #define FOOL_EVENT_WINCH    (FOOL_KEY_ALLOC + 1)
 // Unparsed escape sequences.
@@ -186,7 +192,7 @@ struct fool_event
 #define FOOL_KEY_DOWN       (FOOL_KEY_START + 12)
 #define FOOL_KEY_RIGHT      (FOOL_KEY_START + 13)
 #define FOOL_KEY_LEFT       (FOOL_KEY_START + 14)
-#define FOOL_KEY_CENTER     (FOOL_KEY_START + 15)
+#define FOOL_KEY_BEGIN      (FOOL_KEY_START + 15)
 
 #define FOOL_MASK_KEYPAD    (1 << 23)
 #define FOOL_MASK_SHIFT     (1 << 24)

@@ -22,8 +22,421 @@ static_assert(ATOMIC_POINTER_LOCK_FREE == 2, "ATOMIC_POINTER_LOCK_FREE == 2");
 static_assert(ATOMIC_INT_LOCK_FREE == 2, "ATOMIC_INT_LOCK_FREE == 2");
 static_assert(ATOMIC_BOOL_LOCK_FREE == 2, "ATOMIC_BOOL_LOCK_FREE == 2");
 
-//#define RESET_STRING "\033c\033]104\a\033[!p\033[?3;4l\033[4l\033>"
-#define RESET_STRING "\r\n\x0f\x1b[m\x1b(B\x1b%G\x1b>\r\x1b[K"
+#define ESC "\x1b"
+#define DCS ESC"P"
+#define SOS ESC"X"
+#define SOS ESC"X"
+#define CSI ESC"["
+#define ST ESC"\\"
+#define OSC ESC"]"
+#define PM ESC"^"
+#define APC ESC"_"
+
+//#define ESC"[!p"ESC"[?3;4l"ESC"[4l"ESC">"
+//#define RESET_STRING ESC"c"ESC"]104\a"ESC"[!p"ESC"[?3;4l"ESC"[4l"ESC">"
+const char *INIT_STRING =
+    "\n"
+    ESC"Z"
+    "\5"
+    ESC" F"
+    ESC"="
+    DCS"$q""\"q"ST
+    DCS"$q""\"p"ST
+    DCS"$q""r"ST
+    DCS"$q""s"ST
+    DCS"$q""m"ST
+    DCS"$q"" q"ST
+    DCS"+q""436f;636f6c6f7273 "ST
+    CSI"?1;1;S"
+    CSI">0;1T"
+    CSI">2;3t"
+    CSI"c"
+    CSI">c"
+    // CSI 2/4/12/20 h
+    // CSI ? Pm h
+    CSI"?1004h"
+    CSI"?1035l"
+    CSI"?2004h"
+    // CSI m
+    CSI"5n"
+    CSI"6n"
+    CSI"?6n"
+    CSI"?15n"
+    CSI"?25n"
+    CSI"?26n"
+    CSI"?53n"
+    CSI"?55n"
+    CSI"?56n"
+    CSI"?62n"
+    CSI"?63n"
+    CSI"?75n"
+    CSI"?85n"
+    CSI"$2p"
+    CSI"$4p"
+    CSI"$12p"
+    CSI"$20p"
+    CSI"?1$p"
+    CSI"?2$p"
+    CSI"?3$p"
+    CSI"?4$p"
+    CSI"?5$p"
+    CSI"?6$p"
+    CSI"?7$p"
+    CSI"?8$p"
+    CSI"?9$p"
+    CSI"?10$p"
+    CSI"?12$p"
+    CSI"?18$p"
+    CSI"?19$p"
+    CSI"?25$p"
+    CSI"?30$p"
+    CSI"?35$p"
+    CSI"?38$p"
+    CSI"?40$p"
+    CSI"?41$p"
+    CSI"?42$p"
+    CSI"?44$p"
+    CSI"?45$p"
+    CSI"?46$p"
+    CSI"?47$p"
+    CSI"?66$p"
+    CSI"?67$p"
+    CSI"?69$p"
+    CSI"?95$p"
+    CSI"?1000$p"
+    CSI"?1001$p"
+    CSI"?1002$p"
+    CSI"?1003$p"
+    CSI"?1004$p"
+    CSI"?1005$p"
+    CSI"?1006$p"
+    CSI"?1007$p"
+    CSI"?1010$p"
+    CSI"?1011$p"
+    CSI"?1015$p"
+    CSI"?1034$p"
+    CSI"?1035$p"
+    CSI"?1036$p"
+    CSI"?1037$p"
+    CSI"?1039$p"
+    CSI"?1040$p"
+    CSI"?1041$p"
+    CSI"?1042$p"
+    CSI"?1043$p"
+    CSI"?1044$p"
+    CSI"?1047$p"
+    CSI"?1048$p"
+    CSI"?1049$p"
+    CSI"?1050$p"
+    CSI"?1051$p"
+    CSI"?1052$p"
+    CSI"?1053$p"
+    CSI"?1060$p"
+    CSI"?1061$p"
+    CSI"?2004$p"
+    CSI"11t"
+    CSI"13t"
+    CSI"14t"
+    CSI"18t"
+    CSI"19t"
+    CSI"20t"
+    CSI"21t"
+    CSI"0x"
+    CSI"1x"
+    CSI";;;;;*y"
+    CSI"'|"
+    OSC"4;0;?"ST
+    /*
+    OSC"4;1;?"ST
+    OSC"4;2;?"ST
+    OSC"4;3;?"ST
+    OSC"4;4;?"ST
+    OSC"4;5;?"ST
+    OSC"4;6;?"ST
+    OSC"4;7;?"ST
+    OSC"4;8;?"ST
+    OSC"4;9;?"ST
+    OSC"4;10;?"ST
+    OSC"4;11;?"ST
+    OSC"4;12;?"ST
+    OSC"4;13;?"ST
+    OSC"4;14;?"ST
+    OSC"4;15;?"ST
+    OSC"4;16;?"ST
+    OSC"4;17;?"ST
+    OSC"4;18;?"ST
+    OSC"4;19;?"ST
+    OSC"4;20;?"ST
+    OSC"4;21;?"ST
+    OSC"4;22;?"ST
+    OSC"4;23;?"ST
+    OSC"4;24;?"ST
+    OSC"4;25;?"ST
+    OSC"4;26;?"ST
+    OSC"4;27;?"ST
+    OSC"4;28;?"ST
+    OSC"4;29;?"ST
+    OSC"4;30;?"ST
+    OSC"4;31;?"ST
+    OSC"4;32;?"ST
+    OSC"4;33;?"ST
+    OSC"4;34;?"ST
+    OSC"4;35;?"ST
+    OSC"4;36;?"ST
+    OSC"4;37;?"ST
+    OSC"4;38;?"ST
+    OSC"4;39;?"ST
+    OSC"4;40;?"ST
+    OSC"4;41;?"ST
+    OSC"4;42;?"ST
+    OSC"4;43;?"ST
+    OSC"4;44;?"ST
+    OSC"4;45;?"ST
+    OSC"4;46;?"ST
+    OSC"4;47;?"ST
+    OSC"4;48;?"ST
+    OSC"4;49;?"ST
+    OSC"4;50;?"ST
+    OSC"4;51;?"ST
+    OSC"4;52;?"ST
+    OSC"4;53;?"ST
+    OSC"4;54;?"ST
+    OSC"4;55;?"ST
+    OSC"4;56;?"ST
+    OSC"4;57;?"ST
+    OSC"4;58;?"ST
+    OSC"4;59;?"ST
+    OSC"4;60;?"ST
+    OSC"4;61;?"ST
+    OSC"4;62;?"ST
+    OSC"4;63;?"ST
+    OSC"4;64;?"ST
+    OSC"4;65;?"ST
+    OSC"4;66;?"ST
+    OSC"4;67;?"ST
+    OSC"4;68;?"ST
+    OSC"4;69;?"ST
+    OSC"4;70;?"ST
+    OSC"4;71;?"ST
+    OSC"4;72;?"ST
+    OSC"4;73;?"ST
+    OSC"4;74;?"ST
+    OSC"4;75;?"ST
+    OSC"4;76;?"ST
+    OSC"4;77;?"ST
+    OSC"4;78;?"ST
+    OSC"4;79;?"ST
+    OSC"4;80;?"ST
+    OSC"4;81;?"ST
+    OSC"4;82;?"ST
+    OSC"4;83;?"ST
+    OSC"4;84;?"ST
+    OSC"4;85;?"ST
+    OSC"4;86;?"ST
+    OSC"4;87;?"ST
+    OSC"4;88;?"ST
+    OSC"4;89;?"ST
+    OSC"4;90;?"ST
+    OSC"4;91;?"ST
+    OSC"4;92;?"ST
+    OSC"4;93;?"ST
+    OSC"4;94;?"ST
+    OSC"4;95;?"ST
+    OSC"4;96;?"ST
+    OSC"4;97;?"ST
+    OSC"4;98;?"ST
+    OSC"4;99;?"ST
+    OSC"4;100;?"ST
+    OSC"4;101;?"ST
+    OSC"4;102;?"ST
+    OSC"4;103;?"ST
+    OSC"4;104;?"ST
+    OSC"4;105;?"ST
+    OSC"4;106;?"ST
+    OSC"4;107;?"ST
+    OSC"4;108;?"ST
+    OSC"4;109;?"ST
+    OSC"4;110;?"ST
+    OSC"4;111;?"ST
+    OSC"4;112;?"ST
+    OSC"4;113;?"ST
+    OSC"4;114;?"ST
+    OSC"4;115;?"ST
+    OSC"4;116;?"ST
+    OSC"4;117;?"ST
+    OSC"4;118;?"ST
+    OSC"4;119;?"ST
+    OSC"4;120;?"ST
+    OSC"4;121;?"ST
+    OSC"4;122;?"ST
+    OSC"4;123;?"ST
+    OSC"4;124;?"ST
+    OSC"4;125;?"ST
+    OSC"4;126;?"ST
+    OSC"4;127;?"ST
+    OSC"4;128;?"ST
+    OSC"4;129;?"ST
+    OSC"4;130;?"ST
+    OSC"4;131;?"ST
+    OSC"4;132;?"ST
+    OSC"4;133;?"ST
+    OSC"4;134;?"ST
+    OSC"4;135;?"ST
+    OSC"4;136;?"ST
+    OSC"4;137;?"ST
+    OSC"4;138;?"ST
+    OSC"4;139;?"ST
+    OSC"4;140;?"ST
+    OSC"4;141;?"ST
+    OSC"4;142;?"ST
+    OSC"4;143;?"ST
+    OSC"4;144;?"ST
+    OSC"4;145;?"ST
+    OSC"4;146;?"ST
+    OSC"4;147;?"ST
+    OSC"4;148;?"ST
+    OSC"4;149;?"ST
+    OSC"4;150;?"ST
+    OSC"4;151;?"ST
+    OSC"4;152;?"ST
+    OSC"4;153;?"ST
+    OSC"4;154;?"ST
+    OSC"4;155;?"ST
+    OSC"4;156;?"ST
+    OSC"4;157;?"ST
+    OSC"4;158;?"ST
+    OSC"4;159;?"ST
+    OSC"4;160;?"ST
+    OSC"4;161;?"ST
+    OSC"4;162;?"ST
+    OSC"4;163;?"ST
+    OSC"4;164;?"ST
+    OSC"4;165;?"ST
+    OSC"4;166;?"ST
+    OSC"4;167;?"ST
+    OSC"4;168;?"ST
+    OSC"4;169;?"ST
+    OSC"4;170;?"ST
+    OSC"4;171;?"ST
+    OSC"4;172;?"ST
+    OSC"4;173;?"ST
+    OSC"4;174;?"ST
+    OSC"4;175;?"ST
+    OSC"4;176;?"ST
+    OSC"4;177;?"ST
+    OSC"4;178;?"ST
+    OSC"4;179;?"ST
+    OSC"4;180;?"ST
+    OSC"4;181;?"ST
+    OSC"4;182;?"ST
+    OSC"4;183;?"ST
+    OSC"4;184;?"ST
+    OSC"4;185;?"ST
+    OSC"4;186;?"ST
+    OSC"4;187;?"ST
+    OSC"4;188;?"ST
+    OSC"4;189;?"ST
+    OSC"4;190;?"ST
+    OSC"4;191;?"ST
+    OSC"4;192;?"ST
+    OSC"4;193;?"ST
+    OSC"4;194;?"ST
+    OSC"4;195;?"ST
+    OSC"4;196;?"ST
+    OSC"4;197;?"ST
+    OSC"4;198;?"ST
+    OSC"4;199;?"ST
+    OSC"4;200;?"ST
+    OSC"4;201;?"ST
+    OSC"4;202;?"ST
+    OSC"4;203;?"ST
+    OSC"4;204;?"ST
+    OSC"4;205;?"ST
+    OSC"4;206;?"ST
+    OSC"4;207;?"ST
+    OSC"4;208;?"ST
+    OSC"4;209;?"ST
+    OSC"4;210;?"ST
+    OSC"4;211;?"ST
+    OSC"4;212;?"ST
+    OSC"4;213;?"ST
+    OSC"4;214;?"ST
+    OSC"4;215;?"ST
+    OSC"4;216;?"ST
+    OSC"4;217;?"ST
+    OSC"4;218;?"ST
+    OSC"4;219;?"ST
+    OSC"4;220;?"ST
+    OSC"4;221;?"ST
+    OSC"4;222;?"ST
+    OSC"4;223;?"ST
+    OSC"4;224;?"ST
+    OSC"4;225;?"ST
+    OSC"4;226;?"ST
+    OSC"4;227;?"ST
+    OSC"4;228;?"ST
+    OSC"4;229;?"ST
+    OSC"4;230;?"ST
+    OSC"4;231;?"ST
+    OSC"4;232;?"ST
+    OSC"4;233;?"ST
+    OSC"4;234;?"ST
+    OSC"4;235;?"ST
+    OSC"4;236;?"ST
+    OSC"4;237;?"ST
+    OSC"4;238;?"ST
+    OSC"4;239;?"ST
+    OSC"4;240;?"ST
+    OSC"4;241;?"ST
+    OSC"4;242;?"ST
+    OSC"4;243;?"ST
+    OSC"4;244;?"ST
+    OSC"4;245;?"ST
+    OSC"4;246;?"ST
+    OSC"4;247;?"ST
+    OSC"4;248;?"ST
+    OSC"4;249;?"ST
+    OSC"4;250;?"ST
+    OSC"4;251;?"ST
+    OSC"4;252;?"ST
+    OSC"4;253;?"ST
+    OSC"4;254;?"ST
+    OSC"4;255;?"ST
+    */
+    OSC"5;0;?"ST
+    OSC"5;1;?"ST
+    OSC"5;2;?"ST
+    OSC"5;3;?"ST
+    OSC"5;4;?"ST
+    OSC"10;?"ST
+    OSC"11;?"ST
+    OSC"12;?"ST
+    OSC"13;?"ST
+    OSC"14;?"ST
+    OSC"15;?"ST
+    OSC"16;?"ST
+    OSC"17;?"ST
+    OSC"18;?"ST
+    OSC"19;?"ST
+    "\r"ESC"[K"
+;
+const char *RESET_STRING =
+    "\r\n"
+    "\x0f"
+    ESC"[m"
+    ESC"(B"
+    ESC"%G"
+    ESC">"
+    ESC" F"
+    CSI">0;1;2;3T"
+    CSI"3g"
+    CSI"?1004l"
+    CSI"?1035h"
+    CSI"?2004l"
+    CSI"!p"
+    OSC"104;?"ST
+    "\r"ESC"[K"
+;
 
 
 // Binary compatibility is *not* needed here, since only pointers are exposed.
@@ -264,6 +677,7 @@ fool_io *fool_io_open2(fool_fd rfd, fool_fd wfd, fool_options *opt, size_t opt_s
             head->prev = rvp;
         pthread_mutex_unlock(&mutation_lock_actual);
     }
+    fool_write_harder(rvp->wfd, INIT_STRING, strlen(INIT_STRING));
     return rvp;
 
     // Error handler
@@ -606,22 +1020,37 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
             break;
         switch (last)
         {
+        case ' ': assert (nargs == 0); return FOOL_MASK_KEYPAD | ' '; break;
         case 'A': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_UP; break;
         case 'B': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_DOWN; break;
         case 'C': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_RIGHT; break;
         case 'D': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_LEFT; break;
-        case 'E': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_CENTER; break;
+        case 'E': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_BEGIN; break;
         case 'F': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_END; break;
         case 'H': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_HOME; break;
+        case 'I': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_TAB; break;
+        case 'M': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_ENTER; break;
         case 'P': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(1); break;
         case 'Q': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(2); break;
         case 'R': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(3); break;
         case 'S': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(4); break;
-        case 'o': if (nargs == 0) return FOOL_MASK_KEYPAD | '/'; break;
-        case 'j': if (nargs == 0) return FOOL_MASK_KEYPAD | '*'; break;
-        case 'm': if (nargs == 0) return FOOL_MASK_KEYPAD | '-'; break;
-        case 'k': if (nargs == 0) return FOOL_MASK_KEYPAD | '+'; break;
-        case 'M': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_ENTER; break;
+        case 'X': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '='; break;
+        case 'j': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '*'; break;
+        case 'k': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '+'; break;
+        case 'l': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | ','; break;
+        case 'm': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '-'; break;
+        case 'n': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '.'; break;
+        case 'o': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '/'; break;
+        case 'p': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '0'; break;
+        case 'q': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '1'; break;
+        case 'r': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '2'; break;
+        case 's': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '3'; break;
+        case 't': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '4'; break;
+        case 'u': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '5'; break;
+        case 'v': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '6'; break;
+        case 'w': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '7'; break;
+        case 'x': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '8'; break;
+        case 'y': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '9'; break;
         }
         break;
     case FOOL_EVENT_OTHER_DCS:
@@ -646,21 +1075,44 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
 
         switch (last)
         {
-        case 'A': if (nargs == 0 || (nargs == 2 && args[0] == 1)) return parse_mask(args[1]) | FOOL_KEY_UP; break;
-        case 'B': if (nargs == 0 || (nargs == 2 && args[0] == 1)) return parse_mask(args[1]) | FOOL_KEY_DOWN; break;
-        case 'C': if (nargs == 0 || (nargs == 2 && args[0] == 1)) return parse_mask(args[1]) | FOOL_KEY_RIGHT; break;
-        case 'D': if (nargs == 0 || (nargs == 2 && args[0] == 1)) return parse_mask(args[1]) | FOOL_KEY_LEFT; break;
-        case 'E': if (nargs == 0 || (nargs == 2 && args[0] == 1)) return parse_mask(args[1]) | FOOL_KEY_CENTER; break;
-        case 'F': if (nargs == 0 || (nargs == 2 && args[0] == 1)) return parse_mask(args[1]) | FOOL_KEY_END; break;
-        case 'H': if (nargs == 0 || (nargs == 2 && args[0] == 1)) return parse_mask(args[1]) | FOOL_KEY_HOME; break;
-        case 'P': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_KEY_F(1); break;
-        case 'Q': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_KEY_F(2); break;
-        case 'R': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_KEY_F(3); break;
-        case 'S': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_KEY_F(4); break;
+        case 'A': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_UP; break;
+        case 'B': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_DOWN; break;
+        case 'C': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_RIGHT; break;
+        case 'D': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_LEFT; break;
+        case 'E': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_BEGIN; break;
+        case 'F': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_END; break;
+        case 'H': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_HOME; break;
+        case 'I': if (nargs == 0) return FOOL_EVENT_FOCUS_GAINED; break;
+        case 'O': if (nargs == 0) return FOOL_EVENT_FOCUS_LOST; break;
+        case 'P': if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(1); break;
+        case 'Q': if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(2); break;
+        case 'R': if (io->opts.csi_dollar) break; if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(3); break;
+        case 'S': if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(4); break;
+        case 'X': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '='; break;
+        case 'j': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '*'; break;
+        case 'k': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '+'; break;
+        case 'l': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | ','; break;
+        case 'm': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '-'; break;
+        case 'n': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '.'; break;
+        case 'o': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '/'; break;
+        case 'p': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '0'; break;
+        case 'q': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '1'; break;
+        case 'r': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '2'; break;
+        case 's': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '3'; break;
+        case 't': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '4'; break;
         case 'u':
             if (nargs != 2)
                 break;
+            if (args[0] == 1)
+            {
+                return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '5';
+            }
             return parse_mask(args[1]) | args[0];
+
+        case 'v': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '6'; break;
+        case 'w': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '7'; break;
+        case 'x': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '8'; break;
+        case 'y': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '9'; break;
         case 'z':
             switch (args[0])
             {
@@ -730,6 +1182,8 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
             case 34: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(20);
             case 42: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(21);
             case 43: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(22);
+            case 200: if (nargs == 1) return FOOL_EVENT_PASTE_BEGIN;
+            case 201: if (nargs == 1) return  FOOL_EVENT_PASTE_END;
             }
         }
         break;
@@ -1058,7 +1512,7 @@ no_text:
             }
             if (tmp == '[' && !io->opts.no_csi_lsqb)
                 continue;
-            if (0x30 <= tmp && tmp <= 0x3f)
+            if (0x20 <= tmp && tmp <= 0x3f)
                 continue;
             if (0x40 <= tmp && tmp <= 0x7e)
             {
@@ -1221,6 +1675,18 @@ const char *fool_event_string(fool_io *io, fool_event *ev, int variant)
     case FOOL_EVENT_TIMEOUT:
         rv = "timeout";
         break;
+    case FOOL_EVENT_PASTE_BEGIN:
+        rv = "paste_begin";
+        break;
+    case FOOL_EVENT_PASTE_END:
+        rv = "paste_end";
+        break;
+    case FOOL_EVENT_FOCUS_GAINED:
+        rv = "focus_gained";
+        break;
+    case FOOL_EVENT_FOCUS_LOST:
+        rv = "focus_lost";
+        break;
     case FOOL_EVENT_WINCH:
         rv = "winch\u00a0";
         sprintf(fn, "%hux%hu", ev->coords[0], ev->coords[1]);
@@ -1300,8 +1766,8 @@ const char *fool_event_string(fool_io *io, fool_event *ev, int variant)
     case FOOL_KEY_LEFT:
         rv = "left";
         break;
-    case FOOL_KEY_CENTER:
-        rv = "center";
+    case FOOL_KEY_BEGIN:
+        rv = "begin";
         break;
     case ' ':
         rv = "space";
