@@ -152,6 +152,7 @@ invalid:
 int main(int argc, char **argv)
 {
     unsigned alarm_time = 30;
+    unsigned ctl_c_needed = 3;
 
     fool_options opts = {};
     for (int i = 1; i < argc; ++i)
@@ -159,8 +160,8 @@ int main(int argc, char **argv)
         parse_opt(&opts, argv[i]);
     }
 
-    printf("Program will exit after %d seconds of inactivity\n", alarm_time);
-    printf("(or by pressing ctrl-c twice)\n");
+    printf("Program will exit after %u seconds of inactivity\n", alarm_time);
+    printf("(or by pressing ctrl-c %u times)\n", ctl_c_needed);
 
     fool_io *io = fool_io_open2(STDIN_FILENO, STDOUT_FILENO, &opts, sizeof(opts));
     if (!io)
@@ -169,15 +170,23 @@ int main(int argc, char **argv)
         return 2;
     }
 
-    bool exit_later = false;
+    unsigned ctl_c_actual = 0;
     fool_event ev;
-    while (alarm(alarm_time), fool_event_get(io, &ev) != FOOL_EVENT_EOF)
+    while (alarm(alarm_time), ctl_c_actual != ctl_c_needed && fool_event_get(io, &ev) != FOOL_EVENT_EOF)
     {
-        printf("(0x%08x) -> %s\r\n", ev.basic, fool_event_string(io, &ev, 0));
+        if (ev.basic != FOOL_EVENT_NOTHING)
+        {
+            printf("(0x%08x) -> %s\r\n", ev.basic, fool_event_string(io, &ev, 0));
+            if (ev.basic == (FOOL_MASK_CTRL | 'C') || ev.basic == (FOOL_MASK_CTRL | 'c'))
+            {
+                ctl_c_actual++;
+            }
+            else
+            {
+                ctl_c_actual = 0;
+            }
+        }
         fool_event_free(io, &ev);
-        if (exit_later && ev.basic == (FOOL_MASK_CTRL | 'C'))
-            break;
-        exit_later = ev.basic == (FOOL_MASK_CTRL | 'C');
     }
 
     fool_io_close(io);

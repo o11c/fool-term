@@ -139,6 +139,8 @@ struct fool_event
     void *extra;
 };
 
+// Nothing to see here, move along.
+#define FOOL_EVENT_NOTHING  (FOOL_KEY_START + 0)
 // This was not a TTY, and the end of file/pipe was reached.
 // For TTYs, you will get SIGHUP instead, unless you ignore it.
 #define FOOL_EVENT_EOF      (FOOL_KEY_ALLOC - 1)

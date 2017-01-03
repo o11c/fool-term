@@ -58,6 +58,7 @@ const char *INIT_STRING =
     CSI"?1035l"
     CSI"?2004h"
     // CSI m
+    CSI">4;2m"
     CSI"5n"
     CSI"6n"
     CSI"?6n"
@@ -68,7 +69,7 @@ const char *INIT_STRING =
     CSI"?55n"
     CSI"?56n"
     CSI"?62n"
-    CSI"?63n"
+    CSI"?63;12345n"
     CSI"?75n"
     CSI"?85n"
     CSI"$2p"
@@ -143,7 +144,7 @@ const char *INIT_STRING =
     CSI"21t"
     CSI"0x"
     CSI"1x"
-    CSI";;;;;*y"
+    CSI"1;12345;2;3;4;5*y"
     CSI"'|"
     OSC"4;0;?"ST
     /*
@@ -429,11 +430,12 @@ const char *RESET_STRING =
     ESC">"
     ESC" F"
     CSI">0;1;2;3T"
-    CSI"3g"
+    //CSI"3g"
     CSI"?1004l"
     CSI"?1035h"
     CSI"?2004l"
     CSI"!p"
+    CSI">4m"
     OSC"104;?"ST
     "\r"ESC"[K"
 ;
@@ -590,6 +592,8 @@ fool_io *fool_io_open2(fool_fd rfd, fool_fd wfd, fool_options *opt, size_t opt_s
     }
     if (0 > opt->encoding || opt->encoding >= FOOL_MAX_ENCODINGS)
         return NULL;
+    if (strncmp(opt->term, "rxvt", 4) == 0)
+        opt->csi_dollar = true;
 
 
     // Execute operations
@@ -975,7 +979,7 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
     char lib = '\0';
     char tib = '\0';
     char last = data[size - 1];
-    int args[2] = {};
+    int args[16] = {};
     size_t nargs = 0;
     if (evb == FOOL_EVENT_OTHER_SS3 || evb == FOOL_EVENT_OTHER_CSI)
     {
@@ -1029,7 +1033,7 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
         case 'F': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_END; break;
         case 'H': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_HOME; break;
         case 'I': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_TAB; break;
-        case 'M': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_ENTER; break;
+        case 'M': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | FOOL_KEY_ENTER; break;
         case 'P': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(1); break;
         case 'Q': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(2); break;
         case 'R': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(3); break;
@@ -1054,11 +1058,32 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
         }
         break;
     case FOOL_EVENT_OTHER_DCS:
+        if (size >= 3)
+        {
+            if (data[0] == '0' || data[0] == '1')
+            {
+                // status strings reports
+                // termcap/terminfo strings reports
+                if (data[1] == '$' || data[1] == '+')
+                {
+                    if (data[2] == 'r')
+                    {
+                        return FOOL_EVENT_NOTHING;
+                    }
+                }
+            }
+            char *p = (char *)memchr(data, '!', size-1);
+            if (p && p[1] == '~')
+            {
+                // memory checksum reports (whole or complete)
+                return FOOL_EVENT_NOTHING;
+            }
+        }
         break;
     case FOOL_EVENT_OTHER_SOS:
         break;
     case FOOL_EVENT_OTHER_CSI:
-        if (lib == '[')
+        if (lib == '[' && !tib)
         {
             switch (last)
             {
@@ -1070,6 +1095,62 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
             }
             break;
         }
+        if ((lib == '>' && nargs == 3) || (lib == '?' && nargs >= 1))
+        {
+            if (!tib && last == 'c')
+            {
+                // primary device attributes report
+                // secondary device attributes report
+                return FOOL_EVENT_NOTHING;
+            }
+        }
+        if ((!lib || lib == '?') && tib == '$' && last == 'y' && nargs == 2)
+        {
+            // ansi mode report
+            // private mode report
+            return FOOL_EVENT_NOTHING;
+        }
+        if (((!lib && nargs == 2) || (lib == '?' && nargs >= 2 && nargs <= 3)) && last == 'R')
+        {
+            // collides with F3 in some modes
+            if (lib || args[0] != 1)
+            {
+                // ansi mode report
+                // private mode report
+                return FOOL_EVENT_NOTHING;
+            }
+        }
+        if (((!lib && nargs == 1) || lib == '?') && !tib && last == 'n' && nargs >= 1 && nargs <= 4)
+        {
+            // device status report
+            return FOOL_EVENT_NOTHING;
+        }
+        if (!lib && tib == '*' && last == '{' && nargs == 1)
+        {
+            // macro space report
+            return FOOL_EVENT_NOTHING;
+        }
+        if (!lib && !tib && last == 't' && (nargs == 1 || nargs == 3))
+        {
+            // window reports
+            return FOOL_EVENT_NOTHING;
+        }
+        if (lib == '?' && !tib && last == 'S' && nargs == 3)
+        {
+            // sixel reports
+            return FOOL_EVENT_NOTHING;
+        }
+        if (!lib && !tib && last == 'x' && nargs == 7)
+        {
+            // ??? not in xterm, but in others
+            return FOOL_EVENT_NOTHING;
+        }
+        if (lib == '?' && last == 'x' && nargs == 0)
+        {
+            // ??? not in xterm, but in others
+            return FOOL_EVENT_NOTHING;
+        }
+
         if (lib || tib)
             break;
 
@@ -1174,6 +1255,15 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
             case 24: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(12);
             case 25: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(13);
             case 26: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(14);
+            case 27:
+                if (nargs == 3)
+                {
+                    int32_t rv = parse_mask(args[1]) | args[2];
+                    if (0x20 <= args[2] && args[2] <= 0x10FFFF)
+                        rv &= ~FOOL_MASK_SHIFT;
+                    return rv;
+                }
+                break;
             case 28: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(15);
             case 29: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(16);
             case 31: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(17);
@@ -1188,6 +1278,24 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
         }
         break;
     case FOOL_EVENT_OTHER_OSC:
+        if (size >= 3)
+        {
+            if (data[0] == 'l' || data[0] == 'L')
+            {
+                // window and icon title reports
+                return FOOL_EVENT_NOTHING;
+            }
+            if (data[0] == '4' && data[1] == ';')
+            {
+                // color palette reports
+                return FOOL_EVENT_NOTHING;
+            }
+            if (data[0] == '1' && ('0' <= data[1] && data[1] <= '9') && data[2] == ';')
+            {
+                // "dynamic" colors reports
+                return FOOL_EVENT_NOTHING;
+            }
+        }
         break;
     case FOOL_EVENT_OTHER_PM:
         break;
@@ -1669,6 +1777,9 @@ const char *fool_event_string(fool_io *io, fool_event *ev, int variant)
     char *fnp = fn;
     switch (evb)
     {
+    case FOOL_EVENT_NOTHING:
+        rv = "nothing";
+        break;
     case FOOL_EVENT_EOF:
         rv = "eof";
         break;
