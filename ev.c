@@ -37,7 +37,7 @@ static_assert(ATOMIC_BOOL_LOCK_FREE == 2, "ATOMIC_BOOL_LOCK_FREE == 2");
 const char *INIT_STRING =
     "\n"
     ESC"Z"
-    "\5"
+    "\5" // TODO - often not quoted
     ESC" F"
     ESC"="
     DCS"$q""\"q"ST
@@ -59,6 +59,7 @@ const char *INIT_STRING =
     CSI"?2004h"
     // CSI m
     CSI">4;2m"
+    CSI"m" // for terminals that ignore the > modifier
     CSI"5n"
     CSI"6n"
     CSI"?6n"
@@ -419,6 +420,7 @@ const char *INIT_STRING =
     OSC"17;?"ST
     OSC"18;?"ST
     OSC"19;?"ST
+    OSC"104?"ST
     "\r"ESC"[K"
 ;
 const char *RESET_STRING =
@@ -436,7 +438,7 @@ const char *RESET_STRING =
     CSI"?2004l"
     CSI"!p"
     CSI">4m"
-    OSC"104;?"ST
+    OSC"104?"ST
     "\r"ESC"[K"
 ;
 
@@ -586,13 +588,22 @@ fool_io *fool_io_open2(fool_fd rfd, fool_fd wfd, fool_options *opt, size_t opt_s
             opt->esc_delay = strtol(e, &e, 10);
             if (*e)
                 opt->esc_delay = 0;
-            if (opt->esc_delay == 0)
+        }
+        if (opt->esc_delay == 0)
+        {
+            if (getenv("SSH_TTY"))
+            {
                 opt->esc_delay = 1000;
+            }
+            else
+            {
+                opt->esc_delay = 100;
+            }
         }
     }
     if (0 > opt->encoding || opt->encoding >= FOOL_MAX_ENCODINGS)
         return NULL;
-    if (strncmp(opt->term, "rxvt", 4) == 0)
+    if (strncmp(opt->term, "rxvt", 4) == 0 || strncmp(opt->term, "Eterm", 5) == 0 || strncmp(opt->term, "kterm", 5) == 0)
         opt->csi_dollar = true;
 
 
@@ -769,7 +780,7 @@ static bool getb(fool_io *io, size_t offset, int32_t *out)
             return false;
         }
     }
-    *out = fool_buffer_at(&io->buf, offset);
+    *out = (uint8_t)fool_buffer_at(&io->buf, offset);
     return true;
 }
 
@@ -1034,27 +1045,32 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
         case 'H': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_HOME; break;
         case 'I': if (nargs == 0) return FOOL_MASK_KEYPAD | FOOL_KEY_TAB; break;
         case 'M': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | FOOL_KEY_ENTER; break;
-        case 'P': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(1); break;
-        case 'Q': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(2); break;
-        case 'R': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(3); break;
-        case 'S': if (nargs <= 1) return parse_mask(args[0]) | FOOL_KEY_F(4); break;
+        case 'P': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_F(1); break;
+        case 'Q': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_F(2); break;
+        case 'R': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_F(3); break;
+        case 'S': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_F(4); break;
         case 'X': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '='; break;
-        case 'j': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '*'; break;
-        case 'k': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '+'; break;
-        case 'l': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | ','; break;
-        case 'm': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '-'; break;
-        case 'n': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '.'; break;
-        case 'o': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '/'; break;
-        case 'p': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '0'; break;
-        case 'q': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '1'; break;
-        case 'r': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '2'; break;
-        case 's': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '3'; break;
-        case 't': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '4'; break;
-        case 'u': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '5'; break;
-        case 'v': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '6'; break;
-        case 'w': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '7'; break;
-        case 'x': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '8'; break;
-        case 'y': if (nargs <= 1) return parse_mask(args[0]) | FOOL_MASK_KEYPAD | '9'; break;
+        case 'a': if (nargs == 0) return FOOL_MASK_CTRL | FOOL_KEY_UP; break;
+        case 'b': if (nargs == 0) return FOOL_MASK_CTRL | FOOL_KEY_DOWN; break;
+        case 'c': if (nargs == 0) return FOOL_MASK_CTRL | FOOL_KEY_RIGHT; break;
+        case 'd': if (nargs == 0) return FOOL_MASK_CTRL | FOOL_KEY_LEFT; break;
+        case 'j': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '*'; break;
+        case 'k': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '+'; break;
+        case 'l': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | ','; break;
+        case 'm': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '-'; break;
+        case 'n': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '.'; break;
+        case 'o': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '/'; break;
+        case 'p': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '0'; break;
+        case 'q': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '1'; break;
+        case 'r': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '2'; break;
+        case 's': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '3'; break;
+        case 't': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '4'; break;
+        case 'u': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '5'; break;
+        case 'v': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '6'; break;
+        case 'w': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '7'; break;
+        case 'x': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '8'; break;
+        case 'y': if (nargs <= 2) return parse_mask(args[args[0] == 0]) | FOOL_MASK_KEYPAD | '9'; break;
+        case '~': if (nargs == 1 && args[0] == 3) return FOOL_KEY_DELETE; break;
         }
         break;
     case FOOL_EVENT_OTHER_DCS:
@@ -1110,7 +1126,7 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
             // private mode report
             return FOOL_EVENT_NOTHING;
         }
-        if (((!lib && nargs == 2) || (lib == '?' && nargs >= 2 && nargs <= 3)) && last == 'R')
+        if (((!lib && nargs == 2) || (lib == '?' && nargs >= 2 && nargs <= 3)) && !tib && last == 'R')
         {
             // collides with F3 in some modes
             if (lib || args[0] != 1)
@@ -1145,7 +1161,12 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
             // ??? not in xterm, but in others
             return FOOL_EVENT_NOTHING;
         }
-        if (lib == '?' && last == 'x' && nargs == 0)
+        if (lib == '?' && !tib && last == 'x' && nargs == 0)
+        {
+            // ??? not in xterm, but in others
+            return FOOL_EVENT_NOTHING;
+        }
+        if (!lib && tib == '&' && last == 'w' && nargs == 5)
         {
             // ??? not in xterm, but in others
             return FOOL_EVENT_NOTHING;
@@ -1164,12 +1185,19 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
         case 'F': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_END; break;
         case 'H': if (nargs <= 2) return parse_mask(args[args[0] == 1]) | FOOL_KEY_HOME; break;
         case 'I': if (nargs == 0) return FOOL_EVENT_FOCUS_GAINED; break;
+        case 'J': if (nargs == 1 && args[0] == 2) return parse_mask(args[0]) | FOOL_KEY_HOME; break;
+        case 'M': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | FOOL_KEY_ENTER; break;
         case 'O': if (nargs == 0) return FOOL_EVENT_FOCUS_LOST; break;
-        case 'P': if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(1); break;
-        case 'Q': if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(2); break;
-        case 'R': if (io->opts.csi_dollar) break; if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(3); break;
-        case 'S': if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(4); break;
+        case 'P': if (nargs == 0) return FOOL_KEY_F(1); if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(1); break;
+        case 'Q': if (nargs == 0) return FOOL_KEY_F(2); if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(2); break;
+        case 'R': if (io->opts.csi_dollar) break; if (nargs == 0) return FOOL_KEY_F(3); if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(3); break;
+        case 'S': if (nargs == 0) return FOOL_KEY_F(4); if (nargs == 1 + (args[0] == 1)) return parse_mask(args[nargs - 1]) | FOOL_KEY_F(4); break;
         case 'X': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '='; break;
+        case 'Z': if (nargs == 0) return FOOL_MASK_SHIFT | FOOL_KEY_TAB; break;
+        case 'a': if (nargs == 0) return FOOL_MASK_SHIFT | FOOL_KEY_UP; break;
+        case 'b': if (nargs == 0) return FOOL_MASK_SHIFT | FOOL_KEY_DOWN; break;
+        case 'c': if (nargs == 0) return FOOL_MASK_SHIFT | FOOL_KEY_RIGHT; break;
+        case 'd': if (nargs == 0) return FOOL_MASK_SHIFT | FOOL_KEY_LEFT; break;
         case 'j': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '*'; break;
         case 'k': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | '+'; break;
         case 'l': if (nargs == 2 && args[0] == 1) return parse_mask(args[1]) | FOOL_MASK_KEYPAD | ','; break;
@@ -1241,6 +1269,8 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
             case 4: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_END;
             case 5: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_PAGEUP;
             case 6: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_PAGEDOWN;
+            case 7: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_HOME;
+            case 8: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_END;
             case 11: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(1);
             case 12: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(2);
             case 13: if (nargs <= 2) return parse_mask(args[1]) | FOOL_KEY_F(3);
@@ -1278,13 +1308,16 @@ static int32_t adjust_event(fool_io *io, int32_t evb, char *data, size_t size)
         }
         break;
     case FOOL_EVENT_OTHER_OSC:
-        if (size >= 3)
+        if (size >= 1)
         {
             if (data[0] == 'l' || data[0] == 'L')
             {
                 // window and icon title reports
                 return FOOL_EVENT_NOTHING;
             }
+        }
+        if (size >= 3)
+        {
             if (data[0] == '4' && data[1] == ';')
             {
                 // color palette reports
@@ -1692,9 +1725,9 @@ no_text:
         // * if esc preceded an escape sequence that does not allow alt
         // * whenever an escape sequence hits an invalid character
     esc_error:
-        ev->basic = '\x1b';
+        ev->basic = FOOL_EVENT_ESC_RECOVER;
         // Do not change force_alt.
-        offset = 1;
+        offset = 1 + force_alt;
     }
 
     if (false)
@@ -1777,9 +1810,6 @@ const char *fool_event_string(fool_io *io, fool_event *ev, int variant)
     char *fnp = fn;
     switch (evb)
     {
-    case FOOL_EVENT_NOTHING:
-        rv = "nothing";
-        break;
     case FOOL_EVENT_EOF:
         rv = "eof";
         break;
@@ -1797,6 +1827,12 @@ const char *fool_event_string(fool_io *io, fool_event *ev, int variant)
         break;
     case FOOL_EVENT_FOCUS_LOST:
         rv = "focus_lost";
+        break;
+    case FOOL_EVENT_NOTHING:
+        rv = "nothing";
+        break;
+    case FOOL_EVENT_ESC_RECOVER:
+        rv = "esc-recover";
         break;
     case FOOL_EVENT_WINCH:
         rv = "winch\u00a0";

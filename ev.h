@@ -139,8 +139,6 @@ struct fool_event
     void *extra;
 };
 
-// Nothing to see here, move along.
-#define FOOL_EVENT_NOTHING  (FOOL_KEY_START + 0)
 // This was not a TTY, and the end of file/pipe was reached.
 // For TTYs, you will get SIGHUP instead, unless you ignore it.
 #define FOOL_EVENT_EOF      (FOOL_KEY_ALLOC - 1)
@@ -152,6 +150,10 @@ struct fool_event
 // Is xterm the active window?
 #define FOOL_EVENT_FOCUS_GAINED (FOOL_KEY_ALLOC - 5)
 #define FOOL_EVENT_FOCUS_LOST   (FOOL_KEY_ALLOC - 6)
+// Nothing to see here, move along.
+#define FOOL_EVENT_NOTHING  (FOOL_KEY_ALLOC - 7)
+// Like FOOL_KEY_ESC, but when a sequence was broken.
+#define FOOL_EVENT_ESC_RECOVER  (FOOL_KEY_ALLOC - 8)
 // Please redraw the entire window.
 #define FOOL_EVENT_WINCH    (FOOL_KEY_ALLOC + 1)
 // Unparsed escape sequences.
